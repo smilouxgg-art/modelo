@@ -2,10 +2,10 @@ package com.smiloux.mod.client.audio;
 
 import com.smiloux.mod.SmilouxMod;
 import com.smiloux.mod.client.util.DependencyManager;
+import com.smiloux.mod.init.SmilouxItems;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.Vec3d;
-import com.smiloux.mod.init.SmilouxItems;
 import org.lwjgl.openal.AL10;
 
 import java.nio.ByteBuffer;
@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public final class AudioEngine {
@@ -30,9 +31,23 @@ public final class AudioEngine {
     private boolean positional;
     private boolean paused;
 
+    public CompletableFuture<List<AudioProcessManager.TrackInfo>> search(String query) {
+        return DependencyManager.ensureInstalled().thenCompose(ok -> {
+            if (!ok) return CompletableFuture.failedFuture(new IllegalStateException("No se pudieron instalar yt-dlp/FFmpeg"));
+            return processes.search(query);
+        });
+    }
+
     public CompletableFuture<Void> play(AudioProcessManager.TrackInfo track) {
         queue.clear();
         return start(track, false, Vec3d.ZERO);
+    }
+
+    public CompletableFuture<Void> playRemote(String url, Vec3d pos) {
+        return CompletableFuture.runAsync(() -> {}).thenCompose(v -> processes.search(url))
+            .thenCompose(found -> found.isEmpty()
+                ? CompletableFuture.failedFuture(new IllegalStateException("No se encontró la pista remota"))
+                : start(found.get(0), true, pos));
     }
 
     public CompletableFuture<Void> playPositional(AudioProcessManager.TrackInfo track, Vec3d pos) {
@@ -46,6 +61,7 @@ public final class AudioEngine {
         stopSource();
         AudioProcessManager.TrackInfo next = queue.pollFirst();
         if (next != null) start(next, positional, position);
+        else current = null;
     }
 
     public void previous() {
@@ -57,6 +73,7 @@ public final class AudioEngine {
     public void resume() { if (source != 0) { AL10.alSourcePlay(source); paused = false; } }
 
     public void stop() {
+        processes.stopProcesses();
         stopSource();
         current = null;
         queue.clear();
@@ -77,8 +94,7 @@ public final class AudioEngine {
     public Deque<AudioProcessManager.TrackInfo> getQueue() { return queue; }
 
     public float progressSeconds() {
-        if (source == 0) return 0f;
-        return AL10.alGetSourcef(source, AL10.AL_SEC_OFFSET);
+        return source == 0 ? 0f : AL10.alGetSourcef(source, AL10.AL_SEC_OFFSET);
     }
 
     public void tick(MinecraftClient client) {
@@ -97,7 +113,7 @@ public final class AudioEngine {
     private CompletableFuture<Void> start(AudioProcessManager.TrackInfo track, boolean positional, Vec3d pos) {
         this.positional = positional;
         this.position = pos;
-        if (current != null) history.addLast(current);
+        if (current != null && !history.contains(current)) history.addLast(current);
         current = track;
         paused = false;
         return DependencyManager.ensureInstalled().thenCompose(ok -> {
@@ -143,6 +159,5 @@ public final class AudioEngine {
     }
 
     private boolean isHeadphonesEquipped(ItemStack stack) { return stack.isOf(SmilouxItems.HEADPHONES); }
-
     public void shutdown() { stop(); processes.shutdown(); }
 }
