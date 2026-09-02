@@ -16,7 +16,7 @@ public final class MusicScreen extends Screen {
     private TextFieldWidget searchBox;
     private final List<ButtonWidget> resultButtons = new ArrayList<>();
     private List<MusicTrack> results = List.of();
-    private String status = "Escribe una canción o artista y pulsa Buscar";
+    private String status = "Busca una canción, artista o pega una URL";
     private boolean searching;
 
     public MusicScreen(Screen parent, MusicEngine engine) {
@@ -27,29 +27,31 @@ public final class MusicScreen extends Screen {
 
     @Override
     protected void init() {
-        int center = this.width / 2;
-        searchBox = new TextFieldWidget(this.textRenderer, center - 170, 38, 250, 20, Text.literal("Buscar música"));
+        int center = width / 2;
+        searchBox = new TextFieldWidget(textRenderer, center - 220, 36, 355, 20, Text.literal("Buscar música"));
         searchBox.setMaxLength(120);
         searchBox.setPlaceholder(Text.literal("Canción, artista o URL..."));
         addDrawableChild(searchBox);
 
-        addDrawableChild(ButtonWidget.builder(Text.literal("Buscar"), button -> doSearch())
-            .dimensions(center + 86, 38, 84, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("▶ Reproducir"), b -> {
-            MusicTrack current = engine.getCurrent();
-            if (current != null) engine.resume();
-        }).dimensions(center - 170, 64, 84, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("⏸ Pausa"), b -> engine.pause())
-            .dimensions(center - 80, 64, 84, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("⏭ Siguiente"), b -> engine.next())
-            .dimensions(center + 10, 64, 84, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("⏹ Detener"), b -> engine.stop())
-            .dimensions(center + 100, 64, 84, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Buscar"), b -> doSearch())
+            .dimensions(center + 140, 36, 80, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("▶ Play"), b -> engine.resume())
+            .dimensions(center - 220, 64, 70, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("⏸ Pause"), b -> engine.pause())
+            .dimensions(center - 145, 64, 75, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("⏮ Prev"), b -> engine.previous())
+            .dimensions(center - 65, 64, 70, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("⏭ Next"), b -> engine.next())
+            .dimensions(center + 10, 64, 75, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("⏹ Stop"), b -> engine.stop())
+            .dimensions(center + 90, 64, 70, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("🗑 Vaciar"), b -> engine.clearQueue())
+            .dimensions(center + 165, 64, 75, 20).build());
 
-        addDrawableChild(ButtonWidget.builder(Text.literal("🔉 -"), b -> engine.setVolume(engine.getVolume() - 0.1f))
-            .dimensions(center - 105, 90, 45, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("🔊 +"), b -> engine.setVolume(engine.getVolume() + 0.1f))
-            .dimensions(center + 60, 90, 45, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("🔉 -10%"), b -> engine.setVolume(engine.getVolume() - 0.1f))
+            .dimensions(center - 80, 91, 75, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("🔊 +10%"), b -> engine.setVolume(engine.getVolume() + 0.1f))
+            .dimensions(center + 5, 91, 75, 20).build());
 
         refreshResults();
         searchBox.setFocused(true);
@@ -59,7 +61,7 @@ public final class MusicScreen extends Screen {
         String query = searchBox.getText().trim();
         if (query.isEmpty() || searching) return;
         searching = true;
-        status = "Buscando...";
+        status = "Buscando con yt-dlp...";
         refreshResults();
         SearchService.search(query).whenComplete((found, error) -> MinecraftClient.getInstance().execute(() -> {
             searching = false;
@@ -68,7 +70,7 @@ public final class MusicScreen extends Screen {
                 status = "Error: " + rootMessage(error);
             } else {
                 results = found;
-                status = found.isEmpty() ? "No se encontraron resultados" : "Resultados encontrados: " + found.size();
+                status = found.isEmpty() ? "No se encontraron resultados" : "Resultados: " + found.size();
             }
             refreshResults();
         }));
@@ -78,19 +80,23 @@ public final class MusicScreen extends Screen {
         for (ButtonWidget button : resultButtons) remove(button);
         resultButtons.clear();
 
-        int y = 116;
-        int center = this.width / 2;
+        int y = 120;
+        int center = width / 2;
         int max = Math.min(results.size(), 8);
         for (int i = 0; i < max; i++) {
             MusicTrack track = results.get(i);
             final MusicTrack chosen = track;
-            String title = (i + 1) + ". " + truncate(track.title(), 56);
-            ButtonWidget button = ButtonWidget.builder(Text.literal(title), b -> {
-                engine.play(chosen);
-                status = "Reproduciendo: " + chosen.title();
-            }).dimensions(center - 220, y, 440, 20).build();
-            resultButtons.add(button);
-            addDrawableChild(button);
+            ButtonWidget play = ButtonWidget.builder(
+                Text.literal((i + 1) + ". " + truncate(track.title(), 49)),
+                b -> { engine.play(chosen); status = "▶ " + chosen.title(); })
+                .dimensions(center - 220, y, 365, 20).build();
+            ButtonWidget add = ButtonWidget.builder(Text.literal("+ Cola"),
+                b -> { engine.enqueue(chosen); status = "✓ Añadida: " + chosen.title(); })
+                .dimensions(center + 150, y, 70, 20).build();
+            resultButtons.add(play);
+            resultButtons.add(add);
+            addDrawableChild(play);
+            addDrawableChild(add);
             y += 25;
         }
     }
@@ -110,13 +116,15 @@ public final class MusicScreen extends Screen {
         renderBackground(context, mouseX, mouseY, delta);
         int center = width / 2;
         context.drawCenteredTextWithShadow(textRenderer, Text.literal("♫ MUSIC MOD"), center, 12, 0xFFFFFF);
-        context.drawCenteredTextWithShadow(textRenderer, Text.literal(status), center, 104, 0xB5B5B5);
+        context.drawCenteredTextWithShadow(textRenderer, Text.literal(status), center, 105, 0xB5B5B5);
+        context.drawCenteredTextWithShadow(textRenderer, Text.literal("Dependencias: " + BinaryManager.getStatus()), center, height - 44, 0xAAAAAA);
+
         MusicTrack current = engine.getCurrent();
         if (current != null) {
+            context.drawCenteredTextWithShadow(textRenderer, Text.literal("Ahora: " + truncate(current.title(), 65)), center, height - 28, 0x55FF55);
             context.drawCenteredTextWithShadow(textRenderer,
-                Text.literal("Ahora: " + truncate(current.title(), 70)), center, height - 28, 0x55FF55);
-            context.drawCenteredTextWithShadow(textRenderer,
-                Text.literal(String.format("Volumen: %d%%", Math.round(engine.getVolume() * 100))), center, 94, 0xAAAAAA);
+                Text.literal(String.format("Volumen: %d%% | Cola: %d", Math.round(engine.getVolume() * 100), engine.getQueueSnapshot().size())),
+                center, 94, 0xAAAAAA);
         }
         super.render(context, mouseX, mouseY, delta);
     }
