@@ -1,99 +1,134 @@
 package smilouxgg.music;
 
+import net.minecraft.client.MinecraftClient;
+
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
+import java.util.Locale;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 public final class BinaryManager {
-    private static final Path DIR = Path.of(System.getProperty("user.home"), ".musicmod", "bin");
+    private static final String YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe";
+    private static final String FFMPEG_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
+    private static volatile boolean ready;
+    private static volatile boolean installing;
+    private static volatile String status = "Esperando instalación...";
 
     private BinaryManager() {}
 
+    public static void startAutoInstall() {
+        if (installing || ready) return;
+        installing = true;
+        Thread thread = new Thread(() -> {
+            try {
+                ensureInstalled();
+            } catch (Exception e) {
+                status = "Error: " + e.getMessage();
+            } finally {
+                installing = false;
+            }
+        }, "MusicMod-DependencyInstaller");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    public static boolean isReady() {
+        if (ready) return true;
+        try {
+            ready = Files.exists(ytDlpPath()) && Files.exists(ffmpegPath());
+        } catch (Exception ignored) {}
+        return ready;
+    }
+
+    public static String getStatus() { return status; }
+
+    public static Path ytDlpPath() { return binDirectory().resolve(isWindows() ? "yt-dlp.exe" : "yt-dlp"); }
+    public static Path ffmpegPath() { return binDirectory().resolve(isWindows() ? "ffmpeg.exe" : "ffmpeg"); }
+
     public static void ensureInstalled() throws Exception {
-        Files.createDirectories(DIR);
-        Path ytdlp = DIR.resolve(isWindows() ? "yt-dlp.exe" : "yt-dlp");
-        Path ffmpeg = DIR.resolve(isWindows() ? "ffmpeg.exe" : "ffmpeg");
+        Path bin = binDirectory();
+        Files.createDirectories(bin);
 
-        if (!Files.exists(ytdlp)) {
-            download(isWindows()
-                ? "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
-                : "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp", ytdlp);
-            ytdlp.toFile().setExecutable(true);
+        if (!isWindows() || !isX64()) {
+            if (isCommandAvailable("yt-dlp") && isCommandAvailable("ffmpeg")) {
+                status = "✓ Dependencias encontradas en PATH.";
+                ready = true;
+                return;
+            }
+            throw new IllegalStateException("La instalación automática está preparada para Windows x64. En Linux/macOS usa yt-dlp y FFmpeg en PATH.");
         }
 
-        if (!Files.exists(ffmpeg)) installFfmpeg(ffmpeg);
-    }
-
-    private static void installFfmpeg(Path target) throws Exception {
-        String url;
-        if (isWindows()) {
-            url = "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip";
-        } else if (System.getProperty("os.name").toLowerCase().contains("linux") && System.getProperty("os.arch").contains("64")) {
-            url = "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-linux64-gpl.tar.xz";
-        } else {
-            throw new IllegalStateException("Instalación automática de FFmpeg disponible en Windows x64 y Linux x64.");
+        Path yt = ytDlpPath();
+        Path ff = ffmpegPath();
+        if (!Files.exists(yt)) {
+            status = "Descargando yt-dlp...";
+            download(YTDLP_URL, yt);
+            yt.toFile().setExecutable(true);
         }
-
-        Path archive = Files.createTempFile("musicmod-ffmpeg-", isWindows() ? ".zip" : ".tar.xz");
-        download(url, archive);
-        if (isWindows()) extractWindowsFfmpeg(archive, target);
-        else throw new IllegalStateException("FFmpeg Linux descargado; añade extracción tar.xz para este sistema.");
-        Files.deleteIfExists(archive);
-        target.toFile().setExecutable(true);
+        if (!Files.exists(ff)) {
+            status = "Descargando FFmpeg (~160 MB)...";
+            Path archive = bin.resolve("ffmpeg.zip");
+            download(FFMPEG_URL, archive);
+            extractFfmpeg(archive, ff);
+            Files.deleteIfExists(archive);
+        }
+        ready = Files.exists(yt) && Files.exists(ff);
+        status = ready ? "✓ yt-dlp y FFmpeg listos." : "Faltan dependencias.";
     }
 
-    private static void extractWindowsFfmpeg(Path zip, Path target) throws Exception {
-        try (ZipInputStream in = new ZipInputStream(Files.newInputStream(zip))) {
+    private static void extractFfmpeg(Path zip, Path target) throws Exception {
+        try (InputStream in = Files.newInputStream(zip); ZipInputStream zipIn = new ZipInputStream(in)) {
             ZipEntry entry;
-            while ((entry = in.getNextEntry()) != null) {
-                if (!entry.isDirectory() && entry.getName().endsWith("/bin/ffmpeg.exe")) {
-                    Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+            byte[] buffer = new byte[1024 * 1024];
+            while ((entry = zipIn.getNextEntry()) != null) {
+                String name = entry.getName().replace('\\', '/').toLowerCase(Locale.ROOT);
+                if (!entry.isDirectory() && name.endsWith("/bin/ffmpeg.exe")) {
+                    try (OutputStream out = Files.newOutputStream(target)) {
+                        int read;
+                        while ((read = zipIn.read(buffer)) != -1) out.write(buffer, 0, read);
+                    }
+                    target.toFile().setExecutable(true);
                     return;
                 }
             }
         }
-        throw new IllegalStateException("No se encontró ffmpeg.exe en el paquete descargado.");
-    }
-
-    public static Path downloadAndConvert(String url) throws Exception {
-        ensureInstalled();
-        Path output = Files.createTempFile("musicmod-", ".pcm");
-        Path ytdlp = DIR.resolve(isWindows() ? "yt-dlp.exe" : "yt-dlp");
-        Path ffmpeg = DIR.resolve(isWindows() ? "ffmpeg.exe" : "ffmpeg");
-
-        Process yt = new ProcessBuilder(ytdlp.toString(), "-f", "bestaudio/best", "-o", "-", "--no-playlist", "--quiet", url)
-            .redirectError(ProcessBuilder.Redirect.DISCARD).start();
-        Process ff = new ProcessBuilder(ffmpeg.toString(), "-hide_banner", "-loglevel", "error", "-i", "pipe:0", "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1")
-            .redirectError(ProcessBuilder.Redirect.DISCARD).start();
-
-        yt.getInputStream().transferTo(ff.getOutputStream());
-        ff.getOutputStream().close();
-        Files.copy(ff.getInputStream(), output, StandardCopyOption.REPLACE_EXISTING);
-        int ytCode = yt.waitFor();
-        int ffCode = ff.waitFor();
-        if (ytCode != 0 || ffCode != 0) {
-            Files.deleteIfExists(output);
-            throw new IllegalStateException("yt-dlp o FFmpeg no pudo procesar el audio.");
-        }
-        return output;
+        throw new IllegalStateException("No se encontró ffmpeg.exe en el archivo descargado.");
     }
 
     private static void download(String url, Path target) throws Exception {
         HttpURLConnection connection = (HttpURLConnection) URI.create(url).toURL().openConnection();
         connection.setRequestProperty("User-Agent", "MusicMod/1.0");
-        connection.setConnectTimeout(15000);
-        connection.setReadTimeout(120000);
-        try (InputStream in = connection.getInputStream()) {
-            Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+        connection.setConnectTimeout(20000);
+        connection.setReadTimeout(300000);
+        connection.setInstanceFollowRedirects(true);
+        try (InputStream in = connection.getInputStream(); OutputStream out = Files.newOutputStream(target)) {
+            byte[] buffer = new byte[1024 * 1024];
+            int read;
+            while ((read = in.read(buffer)) != -1) out.write(buffer, 0, read);
         }
     }
 
-    private static boolean isWindows() {
-        return System.getProperty("os.name").toLowerCase().contains("win");
+    private static Path binDirectory() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        Path root = client != null ? client.runDirectory.toPath() : Path.of(".");
+        return root.resolve("musicmod").resolve("bin");
+    }
+
+    private static boolean isCommandAvailable(String command) {
+        try {
+            Process p = new ProcessBuilder(command, "--version").redirectError(ProcessBuilder.Redirect.DISCARD).start();
+            return p.waitFor() == 0;
+        } catch (Exception ignored) { return false; }
+    }
+
+    private static boolean isWindows() { return System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win"); }
+    private static boolean isX64() {
+        String arch = System.getProperty("os.arch").toLowerCase(Locale.ROOT);
+        return arch.contains("amd64") || arch.contains("x86_64");
     }
 }
