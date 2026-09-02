@@ -1,61 +1,42 @@
 package smilouxgg.music;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
-import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
+import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.minecraft.text.Text;
 
-public class MusicMod implements ModInitializer {
+public class MusicMod implements ClientModInitializer {
     public static final String MOD_ID = "musicmod";
     private static final MusicManager MUSIC = new MusicManager();
 
     @Override
-    public void onInitialize() {
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-            dispatcher.register(CommandManager.literal("music")
-                .then(CommandManager.literal("play")
-                    .then(CommandManager.argument("url", StringArgumentType.greedyString())
-                        .executes(ctx -> play(ctx.getSource(), StringArgumentType.getString(ctx, "url")))))
-                .then(CommandManager.literal("stop")
-                    .executes(ctx -> stop(ctx.getSource())))
-                .then(CommandManager.literal("pause")
-                    .executes(ctx -> pause(ctx.getSource())))
-                .then(CommandManager.literal("resume")
-                    .executes(ctx -> resume(ctx.getSource())))
-                .then(CommandManager.literal("status")
-                    .executes(ctx -> status(ctx.getSource())))
-            );
-        });
+    public void onInitializeClient() {
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> dispatcher.register(
+            ClientCommandManager.literal("music")
+                .then(ClientCommandManager.literal("play")
+                    .then(ClientCommandManager.argument("url", StringArgumentType.greedyString())
+                        .executes(ctx -> play(StringArgumentType.getString(ctx, "url")))))
+                .then(ClientCommandManager.literal("stop").executes(ctx -> stop()))
+                .then(ClientCommandManager.literal("pause").executes(ctx -> pause()))
+                .then(ClientCommandManager.literal("resume").executes(ctx -> resume()))
+                .then(ClientCommandManager.literal("status").executes(ctx -> status()))
+        ));
     }
 
-    private static int play(ServerCommandSource source, String url) {
-        MUSIC.play(source.getServer(), url);
-        source.sendFeedback(() -> Text.literal("§a♫ Música iniciada: " + url), false);
+    private static int play(String url) {
+        MUSIC.play(url);
+        send("§a♫ Música iniciada: " + url);
         return 1;
     }
 
-    private static int stop(ServerCommandSource source) {
-        MUSIC.stop();
-        source.sendFeedback(() -> Text.literal("§e♫ Música detenida."), false);
-        return 1;
-    }
+    private static int stop() { MUSIC.stop(); send("§e♫ Música detenida."); return 1; }
+    private static int pause() { MUSIC.pause(); send("§e♫ Música pausada."); return 1; }
+    private static int resume() { MUSIC.resume(); send("§a♫ Música reanudada."); return 1; }
+    private static int status() { send("§b♫ " + MUSIC.status()); return 1; }
 
-    private static int pause(ServerCommandSource source) {
-        MUSIC.pause();
-        source.sendFeedback(() -> Text.literal("§e♫ Música pausada."), false);
-        return 1;
-    }
-
-    private static int resume(ServerCommandSource source) {
-        MUSIC.resume();
-        source.sendFeedback(() -> Text.literal("§a♫ Música reanudada."), false);
-        return 1;
-    }
-
-    private static int status(ServerCommandSource source) {
-        source.sendFeedback(() -> Text.literal("§b♫ " + MUSIC.status()), false);
-        return 1;
+    private static void send(String text) {
+        var client = net.minecraft.client.MinecraftClient.getInstance();
+        if (client.player != null) client.player.sendMessage(Text.literal(text), false);
     }
 }
