@@ -1,5 +1,5 @@
 plugins {
-    id 'net.fabricmc.fabric-loom-remap' version '1.9.1'
+    id 'fabric-loom' version '1.9.1'
     id 'maven-publish'
 }
 
@@ -11,8 +11,8 @@ base {
 }
 
 repositories {
-    maven { url = 'https://maven.fabricmc.net/' }
     mavenCentral()
+    maven { name = 'Fabric'; url = 'https://maven.fabricmc.net/' }
 }
 
 dependencies {
@@ -24,31 +24,49 @@ dependencies {
 
 processResources {
     inputs.property 'version', project.version
-    filesMatching('fabric.mod.json') {
-        expand 'version': project.version
-    }
+    filesMatching('fabric.mod.json') { expand 'version': project.version }
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.release = 21
+    options.encoding = 'UTF-8'
 }
 
 java {
+    toolchain { languageVersion = JavaLanguageVersion.of(21) }
     withSourcesJar()
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+}
+
+loom {
+    splitEnvironmentSourceSets()
+
+    mods {
+        smiloux {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+        }
+    }
+
+    runs {
+        client {
+            client()
+            name = 'Minecraft Client'
+            runDir 'run'
+        }
+        server {
+            server()
+            name = 'Minecraft Server'
+            runDir 'run'
+        }
+    }
 }
 
 jar {
-    from('LICENSE') {
-        rename { "${it}_${project.archives_base_name}" }
-    }
+    from('LICENSE') { rename { "${it}_${project.archives_base_name}" } }
 }
 
 publishing {
     publications {
-        create('mavenJava', MavenPublication) {
-            from components.java
-        }
+        create('mavenJava', MavenPublication) { from components.java }
     }
 }
