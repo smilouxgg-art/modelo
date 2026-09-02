@@ -1,44 +1,27 @@
-# 🎵 Music Module
+# 🎵 Music Mod para Minecraft 1.21.1
 
-Modulo de musica para un bot de Discord con `discord.js`, `@discordjs/voice`, **yt-dlp** y **FFmpeg**.
+Este repositorio contiene un **mod client-side de Fabric para Minecraft 1.21.1** dedicado a la reproducción de música.
 
-## Caracteristicas
+## Lo que incluye
 
-- `?play <cancion o URL>` — busca en YouTube o reproduce una URL.
-- `?skip` — salta la cancion actual.
-- `?pause` / `?resume` — pausa y continua.
-- `?queue` — muestra la cola.
-- `?nowplaying` — muestra la cancion actual.
-- `?stop` — detiene la reproduccion y desconecta.
-- `?musichelp` — ayuda de musica.
-- Descarga automatica de `yt-dlp` durante `npm install`.
-- Detecta FFmpeg instalado en el sistema.
+- GUI con buscador de música.
+- Tecla **M** para abrir la interfaz.
+- Búsqueda con `yt-dlp`.
+- Reproducción y conversión con FFmpeg.
+- Cola de reproducción.
+- Play, pausa, reanudar, anterior, siguiente y detener.
+- Control de volumen.
+- Comandos `/music`.
+- Instalación automática de `yt-dlp` y FFmpeg en Windows x64 al abrir Minecraft.
+- `minecraft-mod/build.bat` para compilar con Gradle automáticamente.
+- GitHub Actions para comprobar la compilación.
 
-## Instalacion
+## Proyecto
 
-1. Instala Node.js 18.17 o superior.
-2. Instala FFmpeg en el sistema y asegurate de que `ffmpeg` este en el PATH.
-3. Ejecuta:
+La implementación del mod está en [`minecraft-mod/`](minecraft-mod/).
 
-```bash
-npm install
-```
+Consulta [`minecraft-mod/README.md`](minecraft-mod/README.md) para instalación, comandos y compilación.
 
-4. Define el token del bot como variable de entorno `DISCORD_TOKEN`.
-5. Ejecuta:
+## Licencia
 
-```bash
-npm start
-```
-
-### FFmpeg
-
-El instalador descarga `yt-dlp` automaticamente. FFmpeg se deja como dependencia del sistema para evitar incluir binarios pesados en el repositorio. Puedes indicar una ruta personalizada con `FFMPEG_PATH`.
-
-## Permisos del bot
-
-El bot necesita permisos para ver canales, enviar mensajes, conectarse a voz y hablar. Tambien necesita el intent **Message Content** activado en el Developer Portal de Discord.
-
-## Uso responsable
-
-Usa el modulo respetando las condiciones de servicio de Discord, YouTube y los derechos de autor del contenido que reproduzcas.
+MIT. Reproduce solamente contenido para el que tengas los derechos o permisos correspondientes.
