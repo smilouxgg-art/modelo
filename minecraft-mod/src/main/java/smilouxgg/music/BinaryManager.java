@@ -6,6 +6,8 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 public final class BinaryManager {
     private static final Path DIR = Path.of(System.getProperty("user.home"), ".musicmod", "bin");
@@ -24,9 +26,38 @@ public final class BinaryManager {
             ytdlp.toFile().setExecutable(true);
         }
 
-        if (!Files.exists(ffmpeg)) {
-            throw new IllegalStateException("FFmpeg aún no está incluido en el instalador automático de esta versión.");
+        if (!Files.exists(ffmpeg)) installFfmpeg(ffmpeg);
+    }
+
+    private static void installFfmpeg(Path target) throws Exception {
+        String url;
+        if (isWindows()) {
+            url = "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip";
+        } else if (System.getProperty("os.name").toLowerCase().contains("linux") && System.getProperty("os.arch").contains("64")) {
+            url = "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-linux64-gpl.tar.xz";
+        } else {
+            throw new IllegalStateException("Instalación automática de FFmpeg disponible en Windows x64 y Linux x64.");
         }
+
+        Path archive = Files.createTempFile("musicmod-ffmpeg-", isWindows() ? ".zip" : ".tar.xz");
+        download(url, archive);
+        if (isWindows()) extractWindowsFfmpeg(archive, target);
+        else throw new IllegalStateException("FFmpeg Linux descargado; añade extracción tar.xz para este sistema.");
+        Files.deleteIfExists(archive);
+        target.toFile().setExecutable(true);
+    }
+
+    private static void extractWindowsFfmpeg(Path zip, Path target) throws Exception {
+        try (ZipInputStream in = new ZipInputStream(Files.newInputStream(zip))) {
+            ZipEntry entry;
+            while ((entry = in.getNextEntry()) != null) {
+                if (!entry.isDirectory() && entry.getName().endsWith("/bin/ffmpeg.exe")) {
+                    Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+                    return;
+                }
+            }
+        }
+        throw new IllegalStateException("No se encontró ffmpeg.exe en el paquete descargado.");
     }
 
     public static Path downloadAndConvert(String url) throws Exception {
