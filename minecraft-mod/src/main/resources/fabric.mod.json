@@ -3,7 +3,7 @@
   "id": "musicmod",
   "version": "${version}",
   "name": "Music Mod",
-  "description": "Reproductor de música para Minecraft 1.21.1 con comandos.",
+  "description": "Reproductor de música para Minecraft 1.21.1 con GUI, buscador, cola, controles y yt-dlp + FFmpeg.",
   "authors": ["smilouxgg-art"],
   "contact": {"sources": "https://github.com/smilouxgg-art/modelo"},
   "license": "MIT",
@@ -14,6 +14,7 @@
   "depends": {
     "fabricloader": ">=0.16.5",
     "minecraft": "1.21.1",
+    "java": ">=21",
     "fabric-api": "*"
   }
 }
