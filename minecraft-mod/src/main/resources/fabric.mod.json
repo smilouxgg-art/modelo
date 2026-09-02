@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "musicmod",
+  "version": "${version}",
+  "name": "Music Mod",
+  "description": "Reproductor de música dentro de Minecraft 1.21.1 usando URLs y comandos.",
+  "authors": ["smilouxgg-art"],
+  "contact": {
+    "sources": "https://github.com/smilouxgg-art/modelo"
+  },
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "smilouxgg.music.MusicMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.5",
+    "minecraft": "1.21.1",
+    "fabric-api": "*"
+  }
+}
