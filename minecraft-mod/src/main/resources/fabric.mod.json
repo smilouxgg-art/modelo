@@ -1,18 +1,19 @@
 {
   "schemaVersion": 1,
-  "id": "musicmod",
+  "id": "smiloux",
   "version": "${version}",
-  "name": "Music Mod",
-  "description": "Reproductor de música para Minecraft 1.21.1 con GUI, buscador, cola, controles y yt-dlp + FFmpeg.",
+  "name": "Smiloux",
+  "description": "Reproductor de audio dinámico para Minecraft 1.21.1 con yt-dlp, FFmpeg, GUI, HUD, DSP y sincronización.",
   "authors": ["smilouxgg-art"],
-  "contact": {"sources": "https://github.com/smilouxgg-art/modelo"},
+  "contact": { "sources": "https://github.com/smilouxgg-art/modelo" },
   "license": "MIT",
-  "environment": "client",
+  "environment": "*",
   "entrypoints": {
-    "client": ["smilouxgg.music.MusicMod"]
+    "main": ["com.smiloux.mod.SmilouxMod"],
+    "client": ["com.smiloux.mod.client.SmilouxClient"]
   },
   "depends": {
-    "fabricloader": ">=0.16.5",
+    "fabricloader": ">=0.15.11",
     "minecraft": "1.21.1",
     "java": ">=21",
     "fabric-api": "*"
